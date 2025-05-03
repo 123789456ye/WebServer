@@ -1,24 +1,19 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-26
- * @copyleft Apache 2.0
- */ 
 #include "buffer.h"
 
 Buffer::Buffer(int initBuffSize) : buffer_(initBuffSize), readPos_(0), writePos_(0) {}
 
-size_t Buffer::ReadableBytes() const {
+size_t Buffer::ReadableBytes() const noexcept {
     return writePos_ - readPos_;
 }
-size_t Buffer::WritableBytes() const {
+size_t Buffer::WritableBytes() const noexcept {
     return buffer_.size() - writePos_;
 }
 
-size_t Buffer::PrependableBytes() const {
+size_t Buffer::PrependableBytes() const noexcept {
     return readPos_;
 }
 
-const char* Buffer::Peek() const {
+const char* Buffer::Peek() const noexcept{
     return BeginPtr_() + readPos_;
 }
 
@@ -29,7 +24,7 @@ void Buffer::Retrieve(size_t len) {
 
 void Buffer::RetrieveUntil(const char* end) {
     assert(Peek() <= end );
-    Retrieve(end - Peek());
+    Retrieve(static_cast<size_t>(end - Peek()));
 }
 
 void Buffer::RetrieveAll() {
@@ -44,17 +39,24 @@ std::string Buffer::RetrieveAllToStr() {
     return str;
 }
 
-const char* Buffer::BeginWriteConst() const {
+const char* Buffer::BeginWriteConst() const noexcept {
     return BeginPtr_() + writePos_;
 }
 
-char* Buffer::BeginWrite() {
+char* Buffer::BeginWrite() noexcept {
     return BeginPtr_() + writePos_;
 }
 
 void Buffer::HasWritten(size_t len) {
     writePos_ += len;
 } 
+
+void Buffer::EnsureWriteable(size_t len) {
+    if(WritableBytes() < len) {
+        MakeSpace_(len);
+    }
+    assert(WritableBytes() >= len);
+}
 
 void Buffer::Append(const std::string& str) {
     Append(str.data(), str.length());
@@ -74,13 +76,6 @@ void Buffer::Append(const char* str, size_t len) {
 
 void Buffer::Append(const Buffer& buff) {
     Append(buff.Peek(), buff.ReadableBytes());
-}
-
-void Buffer::EnsureWriteable(size_t len) {
-    if(WritableBytes() < len) {
-        MakeSpace_(len);
-    }
-    assert(WritableBytes() >= len);
 }
 
 ssize_t Buffer::ReadFd(int fd, int* saveErrno) {
@@ -118,12 +113,12 @@ ssize_t Buffer::WriteFd(int fd, int* saveErrno) {
     return len;
 }
 
-char* Buffer::BeginPtr_() {
-    return &*buffer_.begin();
+char* Buffer::BeginPtr_() noexcept {
+    return buffer_.data();
 }
 
-const char* Buffer::BeginPtr_() const {
-    return &*buffer_.begin();
+const char* Buffer::BeginPtr_() const noexcept {
+    return buffer_.data();
 }
 
 void Buffer::MakeSpace_(size_t len) {
@@ -134,7 +129,7 @@ void Buffer::MakeSpace_(size_t len) {
         size_t readable = ReadableBytes();
         std::copy(BeginPtr_() + readPos_, BeginPtr_() + writePos_, BeginPtr_());
         readPos_ = 0;
-        writePos_ = readPos_ + readable;
+        writePos_ = readable;
         assert(readable == ReadableBytes());
     }
 }

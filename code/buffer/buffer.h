@@ -1,9 +1,3 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-26
- * @copyleft Apache 2.0
- */ 
-
 #ifndef BUFFER_H
 #define BUFFER_H
 #include <cstring>   //perror
@@ -12,17 +6,19 @@
 #include <sys/uio.h> //readv
 #include <vector> //readv
 #include <atomic>
+#include <span>
+#include <string_view>
 #include <assert.h>
 class Buffer {
 public:
-    Buffer(int initBuffSize = 1024);
+    explicit Buffer(int initBuffSize = 1024);
     ~Buffer() = default;
 
-    size_t WritableBytes() const;       
-    size_t ReadableBytes() const ;
-    size_t PrependableBytes() const;
+    size_t WritableBytes() const noexcept;       
+    size_t ReadableBytes() const noexcept;
+    size_t PrependableBytes() const noexcept;
 
-    const char* Peek() const;
+    const char* Peek() const noexcept;
     void EnsureWriteable(size_t len);
     void HasWritten(size_t len);
 
@@ -32,20 +28,20 @@ public:
     void RetrieveAll() ;
     std::string RetrieveAllToStr();
 
-    const char* BeginWriteConst() const;
-    char* BeginWrite();
+    const char* BeginWriteConst() const noexcept;
+    char* BeginWrite() noexcept;
 
-    void Append(const std::string& str);
-    void Append(const char* str, size_t len);
+    void Append(const char* data, size_t len);
     void Append(const void* data, size_t len);
-    void Append(const Buffer& buff);
+    void Append(const std::string& str);
+    void Append(const Buffer& other);
 
     ssize_t ReadFd(int fd, int* Errno);
     ssize_t WriteFd(int fd, int* Errno);
 
 private:
-    char* BeginPtr_();
-    const char* BeginPtr_() const;
+    char* BeginPtr_() noexcept;
+    const char* BeginPtr_() const noexcept;
     void MakeSpace_(size_t len);
 
     std::vector<char> buffer_;
