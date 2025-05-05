@@ -1,17 +1,11 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-25
- * @copyleft Apache 2.0
- */ 
-#ifndef HTTP_REQUEST_H
-#define HTTP_REQUEST_H
+#pragma once
 
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
+#include <string_view>
 #include <regex>
-#include <errno.h>     
-#include <mysql/mysql.h>  //mysql
+#include <mysql/mysql.h>
 
 #include "../buffer/buffer.h"
 #include "../log/log.h"
@@ -20,65 +14,64 @@
 
 class HttpRequest {
 public:
-    enum PARSE_STATE {
+    enum class ParseState {
         REQUEST_LINE,
         HEADERS,
         BODY,
-        FINISH,        
+        FINISH
     };
 
-    enum HTTP_CODE {
+    enum class HttpCode {
         NO_REQUEST = 0,
         GET_REQUEST,
         BAD_REQUEST,
-        NO_RESOURSE,
-        FORBIDDENT_REQUEST,
+        NO_RESOURCE,
+        FORBIDDEN_REQUEST,
         FILE_REQUEST,
         INTERNAL_ERROR,
-        CLOSED_CONNECTION,
+        CLOSED_CONNECTION
     };
     
-    HttpRequest() { Init(); }
+    HttpRequest() { init(); }
     ~HttpRequest() = default;
 
-    void Init();
-    bool parse(Buffer& buff);
+    void init();
+    
+    bool parse(Buffer& buffer);
 
-    std::string path() const;
-    std::string& path();
-    std::string method() const;
-    std::string version() const;
-    std::string GetPost(const std::string& key) const;
-    std::string GetPost(const char* key) const;
-
-    bool IsKeepAlive() const;
-
-    /* 
-    todo 
-    void HttpConn::ParseFormData() {}
-    void HttpConn::ParseJson() {}
-    */
+    std::string_view path() const { return path_; }
+    std::string& path() { return path_; }
+    std::string_view method() const { return method_; }
+    std::string_view version() const { return version_; }
+    
+    std::string_view get_post(std::string_view key) const;
+    
+    bool is_keep_alive() const;
 
 private:
-    bool ParseRequestLine_(const std::string& line);
-    void ParseHeader_(const std::string& line);
-    void ParseBody_(const std::string& line);
+    bool parse_request_line(std::string_view line);
+    void parse_header(std::string_view line);
+    void parse_body(std::string_view line);
+    
+    void process_path();
+    void process_post();
+    
+    void parse_url_encoded();
+    
+    static bool verify_user(std::string_view name, std::string_view pwd, bool is_login);
+    
+    static int convert_hex(char ch);
 
-    void ParsePath_();
-    void ParsePost_();
-    void ParseFromUrlencoded_();
-
-    static bool UserVerify(const std::string& name, const std::string& pwd, bool isLogin);
-
-    PARSE_STATE state_;
-    std::string method_, path_, version_, body_;
+    ParseState state_ = ParseState::REQUEST_LINE;
+    
+    std::string method_;
+    std::string path_;
+    std::string version_;
+    std::string body_;
+    
     std::unordered_map<std::string, std::string> header_;
-    std::unordered_map<std::string, std::string> post_;
+    std::unordered_map<std::string, std::string> post_data_;
 
-    static const std::unordered_set<std::string> DEFAULT_HTML;
-    static const std::unordered_map<std::string, int> DEFAULT_HTML_TAG;
-    static int ConverHex(char ch);
+    static const std::unordered_set<std::string_view> DEFAULT_HTML;
+    static const std::unordered_map<std::string_view, int> DEFAULT_HTML_TAG;
 };
-
-
-#endif //HTTP_REQUEST_H

@@ -1,135 +1,37 @@
 #include "buffer.h"
 
-Buffer::Buffer(int initBuffSize) : buffer_(initBuffSize), readPos_(0), writePos_(0) {}
+ssize_t Buffer::read_fd(int fd, int* saved_errno) noexcept {
+    alignas(alignof(std::max_align_t)) char extra_buffer[kExtraSize];
 
-size_t Buffer::ReadableBytes() const noexcept {
-    return writePos_ - readPos_;
-}
-size_t Buffer::WritableBytes() const noexcept {
-    return buffer_.size() - writePos_;
-}
+    iovec vec[2];
+    const size_t writable = writable_bytes();
 
-size_t Buffer::PrependableBytes() const noexcept {
-    return readPos_;
-}
+    vec[0].iov_base = begin_write();
+    vec[0].iov_len = writable;
+    vec[1].iov_base = extra_buffer;
+    vec[1].iov_len = sizeof(extra_buffer);
 
-const char* Buffer::Peek() const noexcept{
-    return BeginPtr_() + readPos_;
-}
-
-void Buffer::Retrieve(size_t len) {
-    assert(len <= ReadableBytes());
-    readPos_ += len;
-}
-
-void Buffer::RetrieveUntil(const char* end) {
-    assert(Peek() <= end );
-    Retrieve(static_cast<size_t>(end - Peek()));
-}
-
-void Buffer::RetrieveAll() {
-    bzero(&buffer_[0], buffer_.size());
-    readPos_ = 0;
-    writePos_ = 0;
-}
-
-std::string Buffer::RetrieveAllToStr() {
-    std::string str(Peek(), ReadableBytes());
-    RetrieveAll();
-    return str;
-}
-
-const char* Buffer::BeginWriteConst() const noexcept {
-    return BeginPtr_() + writePos_;
-}
-
-char* Buffer::BeginWrite() noexcept {
-    return BeginPtr_() + writePos_;
-}
-
-void Buffer::HasWritten(size_t len) {
-    writePos_ += len;
-} 
-
-void Buffer::EnsureWriteable(size_t len) {
-    if(WritableBytes() < len) {
-        MakeSpace_(len);
+    const ssize_t n = readv(fd, vec, 2);
+    if(n < 0) {
+        *saved_errno = errno;
     }
-    assert(WritableBytes() >= len);
-}
-
-void Buffer::Append(const std::string& str) {
-    Append(str.data(), str.length());
-}
-
-void Buffer::Append(const void* data, size_t len) {
-    assert(data);
-    Append(static_cast<const char*>(data), len);
-}
-
-void Buffer::Append(const char* str, size_t len) {
-    assert(str);
-    EnsureWriteable(len);
-    std::copy(str, str + len, BeginWrite());
-    HasWritten(len);
-}
-
-void Buffer::Append(const Buffer& buff) {
-    Append(buff.Peek(), buff.ReadableBytes());
-}
-
-ssize_t Buffer::ReadFd(int fd, int* saveErrno) {
-    char buff[65535];
-    struct iovec iov[2];
-    const size_t writable = WritableBytes();
-    /* 分散读， 保证数据全部读完 */
-    iov[0].iov_base = BeginPtr_() + writePos_;
-    iov[0].iov_len = writable;
-    iov[1].iov_base = buff;
-    iov[1].iov_len = sizeof(buff);
-
-    const ssize_t len = readv(fd, iov, 2);
-    if(len < 0) {
-        *saveErrno = errno;
-    }
-    else if(static_cast<size_t>(len) <= writable) {
-        writePos_ += len;
+    else if(static_cast<size_t>(n) <= writable) {
+        write_pos_ += n;
     }
     else {
-        writePos_ = buffer_.size();
-        Append(buff, len - writable);
+        write_pos_ = buffer_.size();
+        append(extra_buffer, n - writable);
     }
-    return len;
+    return n;
 }
 
-ssize_t Buffer::WriteFd(int fd, int* saveErrno) {
-    size_t readSize = ReadableBytes();
-    ssize_t len = write(fd, Peek(), readSize);
-    if(len < 0) {
-        *saveErrno = errno;
-        return len;
-    } 
-    readPos_ += len;
-    return len;
-}
-
-char* Buffer::BeginPtr_() noexcept {
-    return buffer_.data();
-}
-
-const char* Buffer::BeginPtr_() const noexcept {
-    return buffer_.data();
-}
-
-void Buffer::MakeSpace_(size_t len) {
-    if(WritableBytes() + PrependableBytes() < len) {
-        buffer_.resize(writePos_ + len + 1);
-    } 
-    else {
-        size_t readable = ReadableBytes();
-        std::copy(BeginPtr_() + readPos_, BeginPtr_() + writePos_, BeginPtr_());
-        readPos_ = 0;
-        writePos_ = readable;
-        assert(readable == ReadableBytes());
+ssize_t Buffer::write_fd(int fd, int* saved_errno) noexcept {
+    const auto view = readable_view();
+    const ssize_t n = write(fd, view.data(), view.size());
+    if(n < 0) {
+        *saved_errno = errno;
+        return n;
     }
+    read_pos_ += n;
+    return n;
 }

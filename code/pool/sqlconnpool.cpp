@@ -1,29 +1,16 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-17
- * @copyleft Apache 2.0
- */ 
-
 #include "sqlconnpool.h"
-using namespace std;
 
-SqlConnPool::SqlConnPool() {
-    useCount_ = 0;
-    freeCount_ = 0;
-}
-
-SqlConnPool* SqlConnPool::Instance() {
+SqlConnPool* SqlConnPool::instance() {
     static SqlConnPool connPool;
     return &connPool;
 }
 
-void SqlConnPool::Init(const char* host, int port,
+void SqlConnPool::init(const char* host, int port,
             const char* user,const char* pwd, const char* dbName,
             int connSize = 10) {
     assert(connSize > 0);
     for (int i = 0; i < connSize; i++) {
-        MYSQL *sql = nullptr;
-        sql = mysql_init(sql);
+        MYSQL *sql = mysql_init(nullptr);
         if (!sql) {
             LOG_ERROR("MySql init error!");
             assert(sql);
@@ -34,49 +21,47 @@ void SqlConnPool::Init(const char* host, int port,
         if (!sql) {
             LOG_ERROR("MySql Connect error!");
         }
-        connQue_.push(sql);
+        conn_que_.push(sql);
     }
     MAX_CONN_ = connSize;
-    sem_init(&semId_, 0, MAX_CONN_);
+    sem_.~counting_semaphore();
+    new (&sem_) std::counting_semaphore<>(MAX_CONN_);
 }
 
-MYSQL* SqlConnPool::GetConn() {
+MYSQL* SqlConnPool::get_conn() {
     MYSQL *sql = nullptr;
-    if(connQue_.empty()){
+    if(conn_que_.empty()){
         LOG_WARN("SqlConnPool busy!");
         return nullptr;
     }
-    sem_wait(&semId_);
+    sem_.acquire();
     {
         lock_guard<mutex> locker(mtx_);
-        sql = connQue_.front();
-        connQue_.pop();
+        sql = conn_que_.front();
+        conn_que_.pop();
     }
     return sql;
 }
 
-void SqlConnPool::FreeConn(MYSQL* sql) {
+void SqlConnPool::free_conn(MYSQL* sql) {
     assert(sql);
     lock_guard<mutex> locker(mtx_);
-    connQue_.push(sql);
-    sem_post(&semId_);
+    conn_que_.push(sql);
+    sem_.release();
 }
 
-void SqlConnPool::ClosePool() {
+void SqlConnPool::close_pool() {
     lock_guard<mutex> locker(mtx_);
-    while(!connQue_.empty()) {
-        auto item = connQue_.front();
-        connQue_.pop();
+    while(!conn_que_.empty()) {
+        MYSQL* item = conn_que_.front();
+        conn_que_.pop();
         mysql_close(item);
     }
     mysql_library_end();        
 }
 
-int SqlConnPool::GetFreeConnCount() {
+int SqlConnPool::get_free_count() {
     lock_guard<mutex> locker(mtx_);
-    return connQue_.size();
+    return conn_que_.size();
 }
 
-SqlConnPool::~SqlConnPool() {
-    ClosePool();
-}

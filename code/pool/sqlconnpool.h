@@ -1,11 +1,4 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-16
- * @copyleft Apache 2.0
- */ 
-#ifndef SQLCONNPOOL_H
-#define SQLCONNPOOL_H
-
+#pragma once
 #include <mysql/mysql.h>
 #include <string>
 #include <queue>
@@ -16,29 +9,31 @@
 
 class SqlConnPool {
 public:
-    static SqlConnPool *Instance();
+    static SqlConnPool *instance();
 
-    MYSQL *GetConn();
-    void FreeConn(MYSQL * conn);
-    int GetFreeConnCount();
+    MYSQL *get_conn();
+    void free_conn(MYSQL * conn);
+    int get_free_count();
 
-    void Init(const char* host, int port,
+    void init(const char* host, int port,
               const char* user,const char* pwd, 
               const char* dbName, int connSize);
-    void ClosePool();
+    void close_pool();
 
 private:
-    SqlConnPool();
-    ~SqlConnPool();
+    SqlConnPool() = default;
+    ~SqlConnPool() {close_pool();}
 
-    int MAX_CONN_;
-    int useCount_;
-    int freeCount_;
+    SqlConnPool(const SqlConnPool&) = delete;
+    SqlConnPool& operator=(const SqlConnPool&) = delete;
+    SqlConnPool(SqlConnPool&&) = delete;
+    SqlConnPool& operator=(SqlConnPool&&) = delete;
 
-    std::queue<MYSQL *> connQue_;
+    int MAX_CONN_ = 0;
+    int use_count_ = 0;
+    int free_count_ = 0;
+
+    std::queue<MYSQL *> conn_que_;
     std::mutex mtx_;
-    sem_t semId_;
+    std::counting_semaphore<> sem_{0};
 };
-
-
-#endif // SQLCONNPOOL_H

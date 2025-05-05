@@ -1,40 +1,35 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-15
- * @copyleft Apache 2.0
- */ 
-#ifndef EPOLLER_H
-#define EPOLLER_H
+#pragma once
 
-#include <sys/epoll.h> //epoll_ctl()
-#include <fcntl.h>  // fcntl()
-#include <unistd.h> // close()
-#include <assert.h> // close()
+#include <sys/epoll.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <vector>
-#include <errno.h>
+#include <stdexcept>
+#include <string>
+#include <cerrno>
+#include <system_error>
 
 class Epoller {
 public:
-    explicit Epoller(int maxEvent = 1024);
-
+    explicit Epoller(int max_events = 1024);
     ~Epoller();
 
-    bool AddFd(int fd, uint32_t events);
+    Epoller(const Epoller&) = delete;
+    Epoller& operator=(const Epoller&) = delete;
 
-    bool ModFd(int fd, uint32_t events);
+    bool add_fd(int fd, uint32_t events);
+    bool mod_fd(int fd, uint32_t events);
+    bool del_fd(int fd);
 
-    bool DelFd(int fd);
+    int wait(int timeout_ms = -1);
 
-    int Wait(int timeoutMs = -1);
+    int get_event_fd(size_t i) const;
 
-    int GetEventFd(size_t i) const;
+    uint32_t get_events(size_t i) const;
 
-    uint32_t GetEvents(size_t i) const;
-        
+    size_t size() const noexcept { return events_.size(); }
+
 private:
-    int epollFd_;
-
-    std::vector<struct epoll_event> events_;    
+    int epoll_fd_;                   
+    std::vector<epoll_event> events_; 
 };
-
-#endif //EPOLLER_H

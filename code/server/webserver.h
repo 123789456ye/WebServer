@@ -1,75 +1,65 @@
-/*
- * @Author       : mark
- * @Date         : 2020-06-17
- * @copyleft Apache 2.0
- */ 
-#ifndef WEBSERVER_H
-#define WEBSERVER_H
+#pragma once
 
 #include <unordered_map>
-#include <fcntl.h>       // fcntl()
-#include <unistd.h>      // close()
-#include <assert.h>
-#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <functional>
+#include <memory>
+#include <string>
 
 #include "epoller.h"
 #include "../log/log.h"
 #include "../timer/heaptimer.h"
 #include "../pool/sqlconnpool.h"
 #include "../pool/threadpool.h"
-#include "../pool/sqlconnRAII.h"
 #include "../http/httpconn.h"
 
 class WebServer {
 public:
     WebServer(
-        int port, int trigMode, int timeoutMS, bool OptLinger, 
-        int sqlPort, const char* sqlUser, const  char* sqlPwd, 
-        const char* dbName, int connPoolNum, int threadNum,
-        bool openLog, int logLevel, int logQueSize);
+        int port, int trig_mode, int timeout_ms, bool opt_linger, 
+        int sql_port, const char* sql_user, const char* sql_pwd, 
+        const char* db_name, int conn_pool_num, int thread_num,
+        bool open_log, int log_level, int log_que_size);
 
     ~WebServer();
-    void Start();
+    void start();
 
 private:
-    bool InitSocket_(); 
-    void InitEventMode_(int trigMode);
-    void AddClient_(int fd, sockaddr_in addr);
+    bool init_socket(); 
+    void init_event_mode(int trig_mode);
+    void add_client(int fd, sockaddr_in addr);
   
-    void DealListen_();
-    void DealWrite_(HttpConn* client);
-    void DealRead_(HttpConn* client);
+    void deal_listen();
+    void deal_write(HttpConn* client);
+    void deal_read(HttpConn* client);
 
-    void SendError_(int fd, const char*info);
-    void ExtentTime_(HttpConn* client);
-    void CloseConn_(HttpConn* client);
+    void send_error(int fd, const char* info);
+    void extend_time(HttpConn* client);
+    void close_conn(HttpConn* client);
 
-    void OnRead_(HttpConn* client);
-    void OnWrite_(HttpConn* client);
-    void OnProcess(HttpConn* client);
+    void on_read(HttpConn* client);
+    void on_write(HttpConn* client);
+    void on_process(HttpConn* client);
 
     static const int MAX_FD = 65536;
-
-    static int SetFdNonblock(int fd);
+    static int set_fd_nonblock(int fd);
 
     int port_;
-    bool openLinger_;
-    int timeoutMS_;  /* 毫秒MS */
-    bool isClose_;
-    int listenFd_;
-    char* srcDir_;
+    bool open_linger_;
+    int timeout_ms_;
+    bool is_close_;
+    int listen_fd_;
+    char* src_dir_;
     
-    uint32_t listenEvent_;
-    uint32_t connEvent_;
+    uint32_t listen_event_;
+    uint32_t conn_event_;
    
     std::unique_ptr<HeapTimer> timer_;
     std::unique_ptr<ThreadPool> threadpool_;
     std::unique_ptr<Epoller> epoller_;
     std::unordered_map<int, HttpConn> users_;
 };
-
-
-#endif //WEBSERVER_H
