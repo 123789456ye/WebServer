@@ -89,6 +89,7 @@ void HeapTimer::tick() {
         return;
     }
     while(!heap_.empty()) {
+        std::lock_guard<std::mutex> lck(mtx_);
         TimerNode node = heap_.front();
         if(std::chrono::duration_cast<MS>(node.expires - Clock::now()).count() > 0) { 
             break; 
@@ -110,7 +111,7 @@ void HeapTimer::clear() {
 
 int HeapTimer::get_next_tick() {
     tick();
-    size_t res = -1;
+    int res = -1;
     if(!heap_.empty()) {
         res = std::chrono::duration_cast<MS>(heap_.front().expires - Clock::now()).count();
         if(res < 0) { res = 0; }

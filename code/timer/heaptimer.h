@@ -53,4 +53,6 @@ private:
     std::vector<TimerNode> heap_;
 
     std::unordered_map<int, size_t> ref_;
+
+    std::mutex mtx_;
 };

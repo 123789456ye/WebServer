@@ -6,15 +6,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <functional>
 #include <memory>
-#include <string>
 
-#include "epoller.h"
+#include "../event/eventloopthreadpool.h"      // 新增
 #include "../log/log.h"
 #include "../timer/heaptimer.h"
 #include "../pool/sqlconnpool.h"
-#include "../pool/threadpool.h"
 #include "../http/httpconn.h"
 
 class WebServer {
@@ -32,18 +29,21 @@ private:
     bool init_socket(); 
     void init_event_mode(int trig_mode);
     void add_client(int fd, sockaddr_in addr);
-  
-    void deal_listen();
-    void deal_write(HttpConn* client);
-    void deal_read(HttpConn* client);
-
+    
+    void handle_listen();
+    void handle_write(HttpConn* client);
+    void handle_read(HttpConn* client);
+    
     void send_error(int fd, const char* info);
     void extend_time(HttpConn* client);
     void close_conn(HttpConn* client);
-
+    
+    void on_connection(int fd);
     void on_read(HttpConn* client);
     void on_write(HttpConn* client);
     void on_process(HttpConn* client);
+
+    void handle_cur();
 
     static const int MAX_FD = 65536;
     static int set_fd_nonblock(int fd);
@@ -57,9 +57,15 @@ private:
     
     uint32_t listen_event_;
     uint32_t conn_event_;
-   
+    
+    // 新增 - 主从Reactor相关
+    std::unique_ptr<EventLoop> main_loop_;               // 主事件循环
+    std::unique_ptr<EventLoopThreadPool> thread_pool_;   // 事件循环线程池
+    std::unique_ptr<Channel> accept_channel_;            // 接受连接的通道
+    
+    // HTTP连接相关
     std::unique_ptr<HeapTimer> timer_;
-    std::unique_ptr<ThreadPool> threadpool_;
-    std::unique_ptr<Epoller> epoller_;
-    std::unordered_map<int, HttpConn> users_;
+    std::unordered_map<int, HttpConn> users_;            // 连接映射表
+    std::unordered_map<int, Channel*> client_channels_;  // 客户端通道
+    std::unordered_map<int, EventLoop*> client_loops_;
 };
