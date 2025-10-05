@@ -7,6 +7,7 @@
 #include <concepts>
 #include <cstring>
 #include <atomic>
+#include <stdexcept>
 #include <sys/uio.h>
 
 class Buffer {
