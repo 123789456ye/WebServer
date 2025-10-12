@@ -6,11 +6,13 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Add stdexec include directory
+# Add stdexec and uring_exec include directories
 include_directories(/home/mycomputer/stdexec/include)
+include_directories(/home/mycomputer/uring_exec/include)
 
 # Add compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -g -O2 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -g -O3 -fPIC")
+set(CMAKE_CXX_COMPILER "/usr/local/gcc-15.2.0/bin/g++")
 
 # Find required packages
 find_package(PkgConfig REQUIRED)
@@ -28,13 +30,6 @@ if(NOT MYSQL_FOUND)
         set(MYSQL_FOUND TRUE)
     endif()
 endif()
-
-# Add the coroutine prototype as a library
-add_library(coro_primitives INTERFACE)
-target_include_directories(coro_primitives INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/code/coro
-    /home/mycomputer/stdexec/include
-)
 
 # Original webserver sources
 file(GLOB_RECURSE WEBSERVER_SOURCES
@@ -60,28 +55,31 @@ if(MYSQL_INCLUDE_DIRS)
     target_include_directories(webserver PRIVATE ${MYSQL_INCLUDE_DIRS})
 endif()
 
-# Async webserver executable (coroutine + io_uring version)
-add_executable(async_webserver
-    code/coro/async_main.cpp
+
+# Proactor webserver executable (pure proactor + multi-threaded io_uring)
+add_executable(proactor_webserver
+    code/coro/proactor_main.cpp
     ${WEBSERVER_SOURCES}
 )
 
-target_link_libraries(async_webserver
-    coro_primitives
+target_link_libraries(proactor_webserver
     pthread
     ${MYSQL_LIBRARIES}
     ${LIBURING_LIBRARIES}
 )
 
-target_include_directories(async_webserver PRIVATE
+target_include_directories(proactor_webserver PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/code/coro
+    /home/mycomputer/stdexec/include
+    /home/mycomputer/uring_exec/include
     ${LIBURING_INCLUDE_DIRS}
 )
 
-# Add MySQL include directories for async webserver too
+# Add MySQL include directories for proactor webserver too
 if(MYSQL_INCLUDE_DIRS)
-    target_include_directories(async_webserver PRIVATE ${MYSQL_INCLUDE_DIRS})
+    target_include_directories(proactor_webserver PRIVATE ${MYSQL_INCLUDE_DIRS})
 endif()
 
-target_compile_options(async_webserver PRIVATE
+target_compile_options(proactor_webserver PRIVATE
     ${LIBURING_CFLAGS_OTHER}
 )
