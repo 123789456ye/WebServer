@@ -16,7 +16,6 @@ int main() {
             .max_connections = 20000,
             .listen_backlog = 16384,
             .opt_linger = false,
-            .keep_alive_timeout = std::chrono::seconds{5}
         };
 
         std::cout << "Configuration:\n";
@@ -25,7 +24,6 @@ int main() {
         std::cout << "  io_uring entries: " << config.uring_entries << "\n";
         std::cout << "  Max connections: " << config.max_connections << "\n";
         std::cout << "  Resource dir: " << config.src_dir << "\n";
-        std::cout << "  Keep-alive timeout: " << config.keep_alive_timeout << "\n";
         std::cout << std::string(60, '-') << "\n";
 
         // Create proactor server
