@@ -11,10 +11,25 @@ WebServer::WebServer(
     : port_(port), open_linger_(opt_linger), timeout_ms_(timeout_ms), is_close_(false),
       listen_fd_(-1), main_loop_(new EventLoop()), timer_(new HeapTimer()) {
     
-    // 获取资源目录
-    src_dir_ = getcwd(nullptr, 256);
+    // 获取资源目录 - 基于可执行文件位置而不是当前工作目录
+    char* exe_path = realpath("/proc/self/exe", nullptr);
+    assert(exe_path);
+
+    // 获取可执行文件目录 (移除文件名)
+    src_dir_ = strdup(exe_path);
     assert(src_dir_);
-    strncat(src_dir_, "/resources/", 16);
+
+    char* last_slash = strrchr(src_dir_, '/');
+    if (last_slash) {
+        *(last_slash + 1) = '\0';  // 保留最后的 '/'
+    }
+
+    // 添加 "../resources/" (因为可执行文件在 build/ 目录)
+    src_dir_ = (char*)realloc(src_dir_, strlen(src_dir_) + strlen("../resources/") + 1);
+    assert(src_dir_);
+    strcat(src_dir_, "../resources/");
+
+    free(exe_path);
     
     // 初始化HTTP静态成员
     HttpConn::user_count = 0;

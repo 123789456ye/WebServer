@@ -12,3 +12,5 @@
 *.log
 *.exe
 /.vscode
+/build
+/.claude
